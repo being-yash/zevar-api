@@ -26,14 +26,16 @@ class AssignVendorRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'product_ids' => 'required|array|min:1',
+            'product_ids' => 'sometimes|array|min:1',
             'product_ids.*' => [
-                'required',
+                'required_with:product_ids',
                 'integer',
                 'exists:product_details,id',
-                // Ensure the product belongs to the order being updated
                 Rule::exists('product_details', 'id')->where(function ($query) {
-                    $query->where('order_id', $this->route('order')->id);
+                    $order = $this->route('order');
+                    if ($order) {
+                        $query->where('order_id', $order->id);
+                    }
                 }),
             ],
             'vendor_id' => 'required|integer|exists:vendors,id',

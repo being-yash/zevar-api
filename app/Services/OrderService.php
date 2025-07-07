@@ -21,6 +21,18 @@ class OrderService
                 ['customer_id' => $customer->id]
             ));
 
+            OrderTransaction::create([
+                'order_id'       => $order->id,
+                'customer_id'    => $customer->id,
+                'trans_amount'   => $data['paid_amount'] ?? 0,
+                'trans_type'     => 'credit',
+                'payment_status' => 'pending',
+                'trans_date'     => now(),
+                'mode'           => $data['payment_method'] ?? null,
+                'remark'         => 'Initial payment on order create',
+                'balance'        => 0,
+            ]);
+
             foreach ($data['products'] as $product) {
                 ProductDetail::create(array_merge($product, [
                     'order_id' => $order->id
@@ -39,40 +51,49 @@ class OrderService
 
     public function updateProductStatus(ProductDetail $product, string $status): ProductDetail
     {
-        $product->fill($data);
-        $product->save();
+        $product->update(['status' => $status]);
         return $product;
     }
 
-    /**
-     * Assigns a vendor to specified products within an order.
-     *
-     * @param \App\Models\Order $order The order instance.
-     * @param array $productIds Array of product IDs to assign.
-     * @param int $vendorId The ID of the vendor to assign.
-     * @param string $status The status to set for the assigned products (default: 'approved').
-     * @return \Illuminate\Support\Collection A collection of updated ProductDetail models.
-     */
+    public function updatePaymentStatus(Order $order, string $status): Order
+    {
+        $order->update(['payment_status' => $status]);
+        OrderTransaction::update(['payment_status' => $status]);
+        return $order;
+    }
+
     public function assignVendorToProducts(Order $order, array $productIds, int $vendorId, string $status = 'approved')
     {
-        return DB::transaction(function () use ($order, $productIds, $vendorId, $status) {
-            // Find products belonging to this order and the given product IDs
-            // Use ProductDetail model directly as it maps to 'product_details' table
-            $productsToUpdate = ProductDetail::where('order_id', $order->id)
-                                             ->whereIn('id', $productIds)
-                                             ->get();
+        $products = $order->productDetails()->whereIn('id', $productIds)->get();
 
-            if ($productsToUpdate->isEmpty()) {
-                throw new \Exception('No matching products found for the given order and product IDs.');
-            }
+        foreach ($products as $product) {
+            $product->vendor_id = $vendorId;
+            $product->status = $status;
+            $product->save();
+        }
 
-            foreach ($productsToUpdate as $product) {
-                $product->vendor_id = $vendorId;
-                $product->status = $status; // Set the new status, e.g., 'approved'
-                $product->save();
-            }
+        // Set order status to approved if not already
+        if ($order->order_status !== 'approved') {
+            $order->order_status = 'approved';
+            $order->save();
+        }
 
-            return $productsToUpdate;
-        });
+        return $products;
+    }
+
+    public function assignVendorToProduct(ProductDetail $product, int $vendorId, string $status = 'approved')
+    {
+        $product->vendor_id = $vendorId;
+        $product->status = $status;
+        $product->save();
+
+        // Also update the parent order status to approved
+        $order = $product->order;
+        if ($order && $order->order_status !== 'approved') {
+            $order->order_status = 'approved';
+            $order->save();
+        }
+
+        return $product;
     }
 }

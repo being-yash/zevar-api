@@ -41,55 +41,94 @@ class OrderController extends Controller
         return response()->json(['message' => 'Order status updated', 'order' => $order]);
     }
 
+    // public function updateProductStatus(Request $request, ProductDetail $product)
+    // {
+    //     try {
+    //         $request->validate([
+    //             'status' => 'sometimes|required|string|in:pending,approved,shipped,delivered,returned,refunded,cancelled',
+    //             'awb_number' => 'nullable|string|max:255',
+    //             'courier_company_id' => 'nullable|exists:courier_companies,id',
+    //             'shipment_date' => 'nullable|date',
+    //             'delivery_date' => 'nullable|date',
+    //             'shiprocket_order_id' => 'nullable|string|max:255', // Assuming string as per schema
+    //             'shiprocket_shipment_id' => 'nullable|string|max:255', // Assuming string as per schema
+    //             'shiprocket_status' => 'nullable|string|max:50',
+    //             'last_status' => 'nullable|string|max:50', // Allow updating last_status
+    //         ]);
+
+    //         // Pass all validated data to the service
+    //         $product = $this->orderService->updateProductStatus($product, $request->validated());
+    //         return response()->json(['message' => 'Product status and/or shipping updated', 'product' => $product]);
+    //     } catch (ValidationException $e) {
+    //         return response()->json(['message' => 'Validation failed', 'errors' => $e->errors()], 422);
+    //     } catch (\Exception $e) {
+    //         \Log::error('Product status/shipping update failed: ' . $e->getMessage(), ['exception' => $e]);
+    //         return response()->json(['message' => 'Product status/shipping update failed.', 'error' => $e->getMessage()], 500);
+    //     }
+    // }
     public function updateProductStatus(Request $request, ProductDetail $product)
     {
-        try {
-            $request->validate([
-                'status' => 'sometimes|required|string|in:pending,approved,shipped,delivered,returned,refunded,cancelled',
-                'awb_number' => 'nullable|string|max:255',
-                'courier_company_id' => 'nullable|exists:courier_companies,id',
-                'shipment_date' => 'nullable|date',
-                'delivery_date' => 'nullable|date',
-                'shiprocket_order_id' => 'nullable|string|max:255', // Assuming string as per schema
-                'shiprocket_shipment_id' => 'nullable|string|max:255', // Assuming string as per schema
-                'shiprocket_status' => 'nullable|string|max:50',
-                'last_status' => 'nullable|string|max:50', // Allow updating last_status
-            ]);
-
-            // Pass all validated data to the service
-            $product = $this->orderService->updateProductStatus($product, $request->validated());
-            return response()->json(['message' => 'Product status and/or shipping updated', 'product' => $product]);
-        } catch (ValidationException $e) {
-            return response()->json(['message' => 'Validation failed', 'errors' => $e->errors()], 422);
-        } catch (\Exception $e) {
-            \Log::error('Product status/shipping update failed: ' . $e->getMessage(), ['exception' => $e]);
-            return response()->json(['message' => 'Product status/shipping update failed.', 'error' => $e->getMessage()], 500);
-        }
+        $request->validate(['status' => 'required|string']);
+        $product = $this->orderService->updateProductStatus($product, $request->status);
+        return response()->json(['message' => 'Product status updated', 'product' => $product]);
     }
 
     /**
-     * Assigns a vendor to specific products within an order.
-     *
-     * @param  \App\Http\Requests\AssignVendorRequest  $request
-     * @param  \App\Models\Order  $order
-     * @return \Illuminate\Http\JsonResponse
+     * Assigns a vendor to products within an order.
+     * If no product_ids are provided, assign all products in the order to the vendor.
      */
-    public function assignVendor(AssignVendorRequest $request, Order $order, ProductDetail $product)
+    public function assignVendor(AssignVendorRequest $request, Order $order)
     {
-        $productIds = $request->input('product_ids');
         $vendorId = $request->input('vendor_id');
-        $status = $request->input('status', 'approved'); // Default status to 'approved' if not provided
+        $status = $request->input('status', 'approved');
+
+        // If product_ids is provided, assign vendor to those products, else assign to all products in the order
+        $productIds = $request->input('product_ids', []);
+        if (empty($productIds)) {
+            // Assign all products in the order
+            $productIds = $order->productDetails()->pluck('id')->toArray();
+        }
 
         try {
             $updatedProducts = $this->orderService->assignVendorToProducts($order, $productIds, $vendorId, $status);
 
             return response()->json([
                 'message' => 'Vendor assigned to products successfully!',
-                'products' => $updatedProducts->load('vendor', 'courierCompany') // Eager load vendor/courier for response
+                'products' => $updatedProducts->load('vendor', 'courierCompany')
             ], 200);
         } catch (\Exception $e) {
             \Log::error('Failed to assign vendor to products: ' . $e->getMessage(), ['exception' => $e]);
             return response()->json(['message' => 'Failed to assign vendor to products.', 'error' => $e->getMessage()], 500);
         }
+    }
+
+    public function updatePaymentStatus(Request $request, Order $order)
+    {
+        $request->validate(['payment_status' => 'required|string']);
+        $order->payment_status = $request->payment_status;
+        $order->save();
+
+        return response()->json([
+            'message' => 'Payment status updated',
+            'order' => $order
+        ]);
+    }
+
+    public function ordersByStatus(Request $request, $status)
+    {
+        $perPage = $request->input('per_page', 10);
+        $orders = Order::with('customer', 'productDetails')
+            ->where('order_status', $status)
+            ->latest()
+            ->paginate($perPage);
+
+
+        return response()->json($orders);
+    }
+
+    public function destroy(Order $order)
+    {
+        $order->delete();
+        return response()->json(['message' => 'Order soft deleted successfully.']);
     }
 }
