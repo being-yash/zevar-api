@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Models\{Order, Customer, ProductDetail};
+use App\Models\{Order, Customer, ProductDetail, OrderTransaction};
 use Illuminate\Support\Facades\DB;
 
 class OrderService
@@ -21,6 +21,8 @@ class OrderService
                 ['customer_id' => $customer->id]
             ));
 
+            $lastBalance = OrderTransaction::where('customer_id', $customerId)->latest()->value('balance') ?? 0;
+            $newBalance = $lastBalance + $amount;
             OrderTransaction::create([
                 'order_id'       => $order->id,
                 'customer_id'    => $customer->id,
@@ -30,7 +32,7 @@ class OrderService
                 'trans_date'     => now(),
                 'mode'           => $data['payment_method'] ?? null,
                 'remark'         => 'Initial payment on order create',
-                'balance'        => 0,
+                'balance'        => $newBalance,
             ]);
 
             foreach ($data['products'] as $product) {
@@ -58,7 +60,7 @@ class OrderService
     public function updatePaymentStatus(Order $order, string $status): Order
     {
         $order->update(['payment_status' => $status]);
-        OrderTransaction::update(['payment_status' => $status]);
+        // OrderTransaction::update(['payment_status' => $status]);
         return $order;
     }
 

@@ -16,26 +16,35 @@ class OrderTransactionController extends Controller
      */
     public function report(Request $request)
     {
-        $query = OrderTransaction::query()->with('order', 'customer');
+        $query = OrderTransaction::query()
+            ->join('orders', 'order_transactions.order_id', '=', 'orders.id')
+            ->join('customers', 'order_transactions.customer_id', '=', 'customers.id')
+            ->select(
+                'order_transactions.*',
+                'orders.order_number',
+                'customers.name as customer_name'
+            );
 
         if ($request->filled('from_date')) {
-            $query->where('trans_date', '>=', $request->from_date);
+            $query->whereDate('trans_date', '>=', $request->from_date);
         }
 
         if ($request->filled('to_date')) {
-            $query->where('trans_date', '<=', $request->to_date);
+            $query->whereDate('trans_date', '<=', $request->to_date);
         }
 
         if ($request->filled('customer_id')) {
-            $query->where('customer_id', $request->customer_id);
+            $query->where('order_transactions.customer_id', $request->customer_id);
         }
 
         if ($request->filled('mode')) {
-            $query->where('mode', $request->mode);
+            $query->where('order_transactions.mode', $request->mode);
         }
 
+        $transactions = $query->orderBy('trans_date', 'desc')->get();
+
         return response()->json([
-            'transactions' => $query->latest()->get()
+            'transactions' => $transactions
         ]);
     }
 

@@ -20,7 +20,10 @@ class VendorController extends Controller
     public function index()
     {
         // Eager load the associated user and preferred courier for efficiency
-        $vendors = Vendor::with(['user', 'preferredCourier'])->latest()->paginate(20);
+        $vendors = Vendor::with(['user', 'preferredCourier'])
+                ->withCount(['products as order_count'])
+                ->orderByDesc('order_count')
+                ->latest()->paginate(20);
         return response()->json($vendors);
     }
 

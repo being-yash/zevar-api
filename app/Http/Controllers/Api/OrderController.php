@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreOrderRequest;
 use App\Http\Requests\AssignVendorRequest;
 use App\Services\OrderService;
-use App\Models\{Order, ProductDetail};
+use App\Models\{Order, ProductDetail, OrderTransaction};
 use Illuminate\Http\Request;
 
 class OrderController extends Controller
@@ -106,6 +106,9 @@ class OrderController extends Controller
     {
         $request->validate(['payment_status' => 'required|string']);
         $order->payment_status = $request->payment_status;
+        OrderTransaction::where('order_id', $order->id)
+            ->update(['payment_status' => 'confirmed']);
+
         $order->save();
 
         return response()->json([

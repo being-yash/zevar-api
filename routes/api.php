@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\VendorController;
 use App\Http\Controllers\Api\ProductDetailController;
 use App\Http\Controllers\Api\OrderTransactionController;
 use Illuminate\Http\Request;
+use App\Http\Controllers\Api\DashboardController;
 
 
 Route::post('/register', [AuthController::class, 'register']);
@@ -35,9 +36,15 @@ Route::middleware('auth:api')->group(function () {
     Route::delete('/product-details/{product}', [ProductDetailController::class, 'destroy']);
     Route::post('/products/update-shipping', [ProductDetailController::class, 'updateShipping']);
     Route::patch('/product-details/{product}/pricing', [ProductDetailController::class, 'updatePricing']);
+    Route::post('/product-details/deliver', [ProductDetailController::class, 'markDelivered']);
+
 
     //order transaction routes
     Route::get('/order-transactions/report', [OrderTransactionController::class, 'report']);
+
+    //dashboard routes
+    Route::get('/dashboard', [DashboardController::class, 'index']);
+
     
     //vendor routes
     Route::apiResource('/vendors', VendorController::class);
