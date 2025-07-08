@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\VendorController;
 use App\Http\Controllers\Api\ProductDetailController;
 use App\Http\Controllers\Api\OrderTransactionController;
+use App\Http\Controllers\Api\BankTransactionController;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Api\DashboardController;
 
@@ -41,6 +42,13 @@ Route::middleware('auth:api')->group(function () {
 
     //order transaction routes
     Route::get('/order-transactions/report', [OrderTransactionController::class, 'report']);
+
+    //bank transaction routes
+    Route::post('/bank-transactions', [BankTransactionController::class, 'store']);
+    Route::get('/bank-transactions/report', [BankTransactionController::class, 'report']);
+    Route::patch('/bank-transactions/{id}', [BankTransactionController::class, 'update']);
+
+
 
     //dashboard routes
     Route::get('/dashboard', [DashboardController::class, 'index']);
